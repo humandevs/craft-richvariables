@@ -1,11 +1,11 @@
 <?php
 /**
- * Rich Variables plugin for Craft CMS 3.x
+ * Rich Variables plugin for Craft CMS 5.x
  *
- * Allows you to easily use Craft Globals as variables in Rich Text fields
+ * Allows you to use entries from specified sections as variables in text, CKEditor, and Redactor fields.
  *
  * @link      https://nystudio107.com
- * @copyright Copyright (c) 2017 nystudio107
+ * @package   RichVariables
  */
 
 namespace nystudio107\richvariables\controllers;
@@ -14,10 +14,11 @@ use aelvan\preparsefield\fields\PreparseFieldType as PreparseField;
 use Craft;
 use craft\base\Field;
 use craft\ckeditor\Field as CKEditorField;
-use craft\fields\Date as DateField;
-use craft\fields\Dropdown as DropdownField;
-use craft\fields\Number as NumberField;
-use craft\fields\PlainText as PlainTextField;
+use craft\elements\Entry;
+use craft\fields\Date;
+use craft\fields\Dropdown;
+use craft\fields\Number;
+use craft\fields\PlainText;
 use craft\helpers\Json;
 use craft\redactor\Field as RedactorField;
 use craft\web\Controller;
@@ -26,7 +27,9 @@ use nystudio107\richvariables\RichVariables;
 use yii\base\InvalidConfigException;
 
 /**
- * @author    nystudio107
+ * Class DefaultController
+ *
+ * @author    
  * @package   RichVariables
  * @since     1.0.0
  */
@@ -36,73 +39,85 @@ class DefaultController extends Controller
     // =========================================================================
 
     const VALID_FIELD_CLASSES = [
-        PlainTextField::class,
-        NumberField::class,
-        DateField::class,
-        DropdownField::class,
-        RedactorField::class,
+        PlainText::class,
+        Number::class,
+        Date::class,
+        Dropdown::class,
         CKEditorField::class,
+        RedactorField::class,
         PreparseField::class,
+        // Add other field types if necessary
     ];
 
     // Public Methods
     // =========================================================================
 
     /**
-     * @return mixed
+     * Returns the variables list as JSON for use in the plugin's JavaScript.
+     *
+     * @return \yii\web\Response
+     * @throws InvalidConfigException
      */
-    public function actionIndex()
+    public function actionIndex(): \yii\web\Response
     {
-        $result = [];
         $variablesList = [];
 
-        // Get the global set to use
+        // Get the section handles from settings
         $settings = RichVariables::$plugin->getSettings();
-        $globalsSet = Craft::$app->getGlobals()->getSetByHandle($settings['globalSetHandle']);
-        // Grab the first global set if they haven't specified one yet
-        if (!$globalsSet) {
-            $allGlobalsSetIds = Craft::$app->getGlobals()->getAllSetIds();
-            if (!empty($allGlobalsSetIds)) {
-                $globalsSet = Craft::$app->globals->getSetById($allGlobalsSetIds[0]);
-            }
+        $variablesSectionHandles = $settings->variablesSectionHandles;
+
+        // Ensure $variablesSectionHandles is an array
+        if (!is_array($variablesSectionHandles)) {
+            $variablesSectionHandles = [$variablesSectionHandles];
         }
-        if ($globalsSet) {
-            // Get the field layout fields used for this global set
-            $layout = $globalsSet->getFieldLayout();
-            if ($layout) {
-                $fieldLayoutFields = $layout->getFields();
-                /** @var Field $field */
-                foreach ($fieldLayoutFields as $field) {
-                    foreach (self::VALID_FIELD_CLASSES as $fieldClass) {
-                        if ($field instanceof $fieldClass) {
-                            // Add the field title and Reference Tag as per https://craftcms.com/docs/reference-tags
-                            $thisVar = [
-                                'title' => $field->name,
-                                'text' => '{globalset:' . $globalsSet->attributes['id'] . ':' . $field->handle . '}',
-                            ];
-                            $variablesList[] = $thisVar;
+
+        // Fetch entries from the specified sections
+        foreach ($variablesSectionHandles as $sectionHandle) {
+            $entries = Entry::find()
+                ->section($sectionHandle)
+                ->all();
+
+            foreach ($entries as $entry) {
+                $layout = $entry->getFieldLayout();
+                if ($layout) {
+                    $fields = $layout->getCustomFields();
+                    /** @var Field $field */
+                    foreach ($fields as $field) {
+                        foreach (self::VALID_FIELD_CLASSES as $fieldClass) {
+                            if ($field instanceof $fieldClass) {
+                                // Build the variable title and Reference Tag
+                                $thisVar = [
+                                    'title' => $sectionHandle . ' - ' . $entry->title . ' - ' . $field->name,
+                                    'text' => '{entry:' . $entry->id . ':' . $field->handle . '}',
+                                ];
+                                $variablesList[] = $thisVar;
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Get the URL to our menu icon from our resource bundle
+        // Get the URL to our menu icon from our asset bundle
         try {
             Craft::$app->getView()->registerAssetBundle(RichVariablesAsset::class);
         } catch (InvalidConfigException $e) {
             Craft::error($e->getMessage(), __METHOD__);
         }
+
         $menuIconUrl = Craft::$app->assetManager->getPublishedUrl(
-                '@nystudio107/richvariables/web/assets/dist',
-                true
-            ) . '/img/RichVariables-menu-icon.svg';
+            '@nystudio107/richvariables/assetbundles/richvariables/dist',
+            true
+        ) . '/img/RichVariables-menu-icon.svg';
+
+        // Prepare the result array
+        $result = [
+            'variablesList' => $variablesList,
+            'menuIconUrl' => $menuIconUrl,
+            'useIconForMenu' => $settings->useIconForMenu,
+        ];
 
         // Return everything to our JavaScript encoded as JSON
-        $result['variablesList'] = $variablesList;
-        $result['menuIconUrl'] = $menuIconUrl;
-        $result['useIconForMenu'] = $settings['useIconForMenu'];
-
-        return Json::encode($result);
+        return $this->asJson($result);
     }
 }

@@ -10,7 +10,7 @@
 
 namespace nystudio107\richvariables\assetbundles\richvariables;
 
-use craft\redactor\assets\redactor\RedactorAsset;
+use craft\ckeditor\assets\ckeditor\CKEditorAsset;
 use craft\web\AssetBundle;
 use craft\web\assets\cp\CpAsset;
 use craft\web\assets\vue\VueAsset;
@@ -28,14 +28,14 @@ class RichVariablesAsset extends AssetBundle
     /**
      * @inheritdoc
      */
-    public function init()
+    public function init(): void
     {
         $this->sourcePath = "@nystudio107/richvariables/web/assets/dist";
 
         $this->depends = [
             CpAsset::class,
             VueAsset::class,
-            RedactorAsset::class,
+            CKEditorAsset::class,
         ];
 
         $this->js = [

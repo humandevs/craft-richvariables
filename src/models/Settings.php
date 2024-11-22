@@ -1,11 +1,11 @@
 <?php
 /**
- * Rich Variables plugin for Craft CMS 3.x
+ * Rich Variables plugin for Craft CMS 5.x
  *
- * Allows you to easily use Craft Globals as variables in Rich Text fields
+ * Allows you to use entries from specified sections as variables in text and CKEditor fields.
  *
  * @link      https://nystudio107.com
- * @copyright Copyright (c) 2017 nystudio107
+ * @package   RichVariables
  */
 
 namespace nystudio107\richvariables\models;
@@ -13,9 +13,10 @@ namespace nystudio107\richvariables\models;
 use craft\base\Model;
 
 /**
- * @author    nystudio107
+ * Class Settings
+ *
  * @package   RichVariables
- * @since     1.0.0
+ * @since     2.0.0
  */
 class Settings extends Model
 {
@@ -23,14 +24,18 @@ class Settings extends Model
     // =========================================================================
 
     /**
-     * @var string
+     * The section handles containing variable entries.
+     *
+     * @var array
      */
-    public $globalSetHandle = '';
+    public array $variablesSectionHandles = [];
 
     /**
+     * Whether to use an icon for the menu.
+     *
      * @var bool
      */
-    public $useIconForMenu = true;
+    public bool $useIconForMenu = true;
 
     // Public Methods
     // =========================================================================
@@ -41,9 +46,10 @@ class Settings extends Model
     public function rules(): array
     {
         return [
-            ['globalSetHandle', 'string'],
-            ['useIconForMenu', 'boolean'],
-            ['globalSetHandle', 'default', 'value' => ''],
+            [['variablesSectionHandles'], 'required'],
+            [['variablesSectionHandles'], 'each', 'rule' => ['string']],
+            [['useIconForMenu'], 'boolean'],
+            [['useIconForMenu'], 'default', 'value' => true],
         ];
     }
 }
